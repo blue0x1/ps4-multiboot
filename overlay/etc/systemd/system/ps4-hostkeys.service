@@ -1,0 +1,13 @@
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+[Unit]
+Description=Generate unique SSH host keys for this install
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+Before=ssh.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=multi-user.target

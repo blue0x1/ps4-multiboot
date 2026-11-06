@@ -1,0 +1,18 @@
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Packages in every Parrot build (one per line).
+# The desktop is added by PROFILE=desktop; security tools by TOOLS=<parrot metapackage>.
+
+parrot-core
+systemd-sysv
+network-manager
+openssh-server
+sudo
+python3
+firmware-amd-graphics
+firmware-misc-nonfree
+firmware-realtek
+firmware-atheros
+bluez
+e2fsprogs
+cryptsetup-bin
+dmsetup

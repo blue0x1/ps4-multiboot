@@ -1,0 +1,144 @@
+Kali-PS4 kernel fix.
+Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/ps4_bridge.c b/drivers/gpu/drm/amd/amdgpu/ps4_bridge.c
+index 683c77d51..c56d70d3b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ps4_bridge.c
++++ b/drivers/gpu/drm/amd/amdgpu/ps4_bridge.c
+@@ -40,6 +40,7 @@
+ #include <drm/drm_bridge.h>
+ #include <drm/drm_encoder.h>
+ 
++#include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-algo-bit.h>
+@@ -352,7 +353,7 @@ static void cq_mask(struct i2c_cmdqueue *q, u16 addr, u8 value, u8 mask)
+ 	*q->p++ = mask;
+ }
+ 
+-#if 0
++#if 1
+ static void cq_delay(struct i2c_cmdqueue *q, u16 time)
+ {
+ 	cq_cmd(q, CMD_DELAY);
+@@ -483,6 +484,33 @@ static void ps4_bridge_pre_enable(struct drm_bridge *bridge)
+ 	mutex_unlock(&mn_bridge->mutex);
+ }
+ 
++/*
++ * Kali-PS4: on a Belize PS4 Pro (CUH-7016B) the MN864729 ends its setup with
++ * the HDMI output enables (0x1e00 bit 0, 0x1e02 bits 4-6) cleared and the
++ * video mute (VMUTECNT CCVMUTE) set, and an EDID read through the bridge
++ * clears them again: the TV shows "No signal" although the DP input is locked
++ * and the 1080p timing is measured. Found live with tools/ps4-bridge.py:
++ * setting these gives colour bars, then the console. Called with
++ * mn_bridge->mutex held.
++ */
++static void ps4_bridge_mn864729_output_on(struct ps4_bridge *mn_bridge)
++{
++	cq_init(&mn_bridge->cq, 4);
++	cq_mask(&mn_bridge->cq, 0x1e02, 0x70, 0x70);
++	cq_mask(&mn_bridge->cq, 0x1e00, 0x01, 0x01);
++	cq_writereg(&mn_bridge->cq, VMUTECNT, VMUTECNT_LINEWIDTH_90);
++	if (cq_exec(&mn_bridge->cq) < 0) {
++		DRM_ERROR("ps4_bridge: MN864729 output enable failed\n");
++		return;
++	}
++	cq_init(&mn_bridge->cq, 1);
++	cq_read(&mn_bridge->cq, 0x1e00, 3);
++	if (cq_exec(&mn_bridge->cq) >= 11)
++		DRM_INFO("ps4_bridge: MN864729 output on: 0x1e00=0x%02x 0x1e02=0x%02x\n",
++			 mn_bridge->cq.reply.databuf[3],
++			 mn_bridge->cq.reply.databuf[5]);
++}
++
+ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ {
+ 	struct ps4_bridge *mn_bridge = bridge_to_ps4_bridge(bridge);
+@@ -637,6 +665,11 @@ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ 	else
+ 	{
+ 		/* Panasonic MN864729 */
++		/* Kali-PS4: Slim/Pro bridge. Use the staged sequence with the
++		 * original delays: run as one queue the bridge reports success
++		 * but the TV gets no image (approach from the Android TV for
++		 * PS4 16 / psX kernels, GPL). Let the GPU DP TX settle first. */
++		msleep(500);
+ 		mutex_lock(&mn_bridge->mutex);
+ 		cq_init(&mn_bridge->cq, 4);
+ 		cq_mask(&mn_bridge->cq, 0x6005, 0x01, 0x01);
+@@ -647,16 +680,17 @@ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ 		cq_wait_set(&mn_bridge->cq, 0x60f9, 0x01);
+ 		cq_writereg(&mn_bridge->cq, 0x6a01, 0x4d);
+ 		cq_wait_set(&mn_bridge->cq, 0x60f9, 0x1a);
++		if (cq_exec(&mn_bridge->cq) < 0)
++			DRM_ERROR("ps4_bridge: MN864729 lane stage failed\n");
++		cq_init(&mn_bridge->cq, 4);
+ 
+ 		cq_mask(&mn_bridge->cq, 0x1e00, 0x00, 0x21);
+ 		cq_mask(&mn_bridge->cq, 0x1e02, 0x00, 0x70);
+ 		// 03 08 01 01 00  2c 01 00
+-		//rancido has no delay here vvv
+-		//cq_delay(&mn_bridge->cq, 0x012c);
++		cq_delay(&mn_bridge->cq, 0x012c);
+ 		cq_writereg(&mn_bridge->cq, 0x6020, 0x00);
+ 
+-		//rancido has no delay here vvv
+-		//cq_delay(&mn_bridge->cq, 0x0032);
++		cq_delay(&mn_bridge->cq, 0x0032);
+ 		cq_writereg(&mn_bridge->cq, 0x7402, 0x1c);
+ 		cq_writereg(&mn_bridge->cq, 0x6020, 0x04);
+ 		cq_writereg(&mn_bridge->cq, TSYSCTRL, TSYSCTRL_HDMI);
+@@ -697,10 +731,12 @@ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ 		//cq_writereg(&mn_bridge->cq, 0x7a00, 0x0e);
+ 
+ 		cq_wait_set(&mn_bridge->cq, 0x10f6, 0x80);
++		if (cq_exec(&mn_bridge->cq) < 0)
++			DRM_ERROR("ps4_bridge: MN864729 hdmi-update stage failed\n");
++		cq_init(&mn_bridge->cq, 4);
+ 		cq_mask(&mn_bridge->cq, 0x7226, 0x00, 0x80);
+ 		cq_mask(&mn_bridge->cq, 0x7228, 0x00, 0xFF);
+-		// rancido has no delay here vvv
+-		//cq_delay(&mn_bridge->cq, 0x012c);
++		cq_delay(&mn_bridge->cq, 0x012c);
+ 		cq_writereg(&mn_bridge->cq, 0x7204, 0x40);
+ 		cq_wait_clear(&mn_bridge->cq, 0x7204, 0x40);
+ 		cq_writereg(&mn_bridge->cq, 0x7a8b, 0x05);
+@@ -712,6 +748,13 @@ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ 		if (cq_exec(&mn_bridge->cq) < 0) {
+ 			DRM_ERROR("Failed to configure ps4-bridge (MN864729) mode\n");
+ 		}
++		cq_init(&mn_bridge->cq, 1);
++		cq_read(&mn_bridge->cq, 0x60f8, 2);
++		if (cq_exec(&mn_bridge->cq) >= 10)
++			DRM_INFO("ps4_bridge: MN864729 set up, lane status 0x60f8=0x%02x 0x60f9=0x%02x\n",
++				 mn_bridge->cq.reply.databuf[3], mn_bridge->cq.reply.databuf[4]);
++		else
++			DRM_INFO("ps4_bridge: MN864729 set up, lane status unreadable\n");
+ 		#if 1
+ 		// AUDIO preinit
+ 		cq_init(&mn_bridge->cq, 4);
+@@ -753,6 +796,8 @@ static void ps4_bridge_enable(struct drm_bridge *bridge)
+ 				DRM_ERROR("failed to run enable hdmi audio seq. 1");
+ 		}
+ 		#endif
++
++		ps4_bridge_mn864729_output_on(mn_bridge);
+ 		mutex_unlock(&mn_bridge->mutex);
+ 	}
+ 
+@@ -953,6 +998,13 @@ int ps4_bridge_get_modes(struct drm_connector *connector)
+ 		DRM_DEBUG_KMS("ps4_bridge_get_modes: EDID ok, %d modes, extensions=%u\n",
+ 			      count, raw_edid ? raw_edid->extensions : 0);
+ 		drm_edid_free(drm_edid);
++		/* Reading the EDID through the MN864729 turns its output off. */
++		if (g_bridge && g_bridge->enabled &&
++		    to_pci_dev(dev->dev)->device != PCI_DEVICE_ID_CUH_11XX) {
++			mutex_lock(&g_bridge->mutex);
++			ps4_bridge_mn864729_output_on(g_bridge);
++			mutex_unlock(&g_bridge->mutex);
++		}
+ 		return count;
+ 	}
+ 

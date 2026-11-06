@@ -1,0 +1,12 @@
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+[Unit]
+Description=Keep the PS4 Slim/Pro HDMI bridge output on
+After=systemd-modules-load.service
+
+[Service]
+ExecStart=/usr/local/sbin/ps4-hdmi-keepalive
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Extra packages for PROFILE=desktop.
+
+kali-desktop-xfce
+xserver-xorg-video-amdgpu
+pipewire-pulse
+joystick

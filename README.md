@@ -1,0 +1,143 @@
+<h1 align="center">Linux for PS4</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-PS4-003791?logo=playstation&logoColor=white" alt="Platform: PS4">
+  <img src="https://img.shields.io/badge/Kali-Linux-557C94?logo=kalilinux&logoColor=white" alt="Kali Linux">
+  <img src="https://img.shields.io/badge/Parrot-OS-15E0ED?logo=parrotsecurity&logoColor=white" alt="Parrot OS">
+  <img src="https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white" alt="Debian">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-blue" alt="License: GPL-2.0"></a>
+</p>
+
+One menu to install and boot several Linux distros on a jailbroken PlayStation 4, all from the controller. Copy a distro's rootfs archive to the PS4 and it appears in the menu, ready to install. The installer adds everything the PS4 needs by itself. No PC tools, partitioning or USB stick are needed.
+
+Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on [Kali Linux for PS4](https://github.com/blue0x1/kali-ps4).
+
+## Features
+
+- **Boot menu on the TV**: one card per distro with its own name and logo. Installed ones start with X, new ones install. The first installed distro starts by itself after 10 seconds.
+- **Any distro**: drop in any x86_64 Linux rootfs archive (`.tar.xz`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
+- **Several distros side by side**, each in its own file on the PS4's internal drive (`/user/home/<name>-ps4.img`). The PS4 system software and its other data are not touched, and nothing is repartitioned.
+- **Install to the PS4 or to a USB drive**, chosen per distro.
+- **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
+- **Works with Kali for PS4 installs**: an existing `/user/home/kali-ps4.img` shows up in the menu as is.
+
+## Requirements
+
+- A jailbroken PS4 with **GoldHEN** (for its FTP server and payload loader).
+- A PC on the same network with an FTP client (for example FileZilla).
+- About 28 GB free on the PS4 for each distro installed on it (a 16 GB disk, and 10 GB always left free for the PS4), or a USB drive of 8 GB or more per distro.
+- Optional: a DualShock 4 with a USB cable, or a USB keyboard.
+
+## Install
+
+1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`.
+
+2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz`, for example `debian-ps4-rootfs.tar.xz` (see [Where to get distros](#where-to-get-distros)).
+
+3. Turn on GoldHEN's FTP server and copy the files to the PS4 (port 2121):
+
+   | File | Folder on the PS4 |
+   |---|---|
+   | `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` | `/data/linux/boot/` |
+   | `<name>-ps4-rootfs.tar.xz` (one per distro) | `/user/home/` |
+   | `linux-2048mb.bin` | `/data/payloads/` |
+
+4. Run `linux-2048mb.bin` from GoldHEN's payload menu.
+
+   > **Be patient:** after the payload starts, the TV can show **"No signal" or a black screen for 1 to 2 minutes** while Linux starts. This is normal.
+
+5. In the menu, pick a distro, then **Install to PS4** or **Install to USB drive**. A full desktop distro takes about 10 to 15 minutes, a minimal one a few minutes.
+
+## Where to get distros
+
+| Source | What you get |
+|---|---|
+| This project's Releases | **Kali Linux** and **Parrot OS** with the XFCE desktop, ready to use |
+| [images.linuxcontainers.org](https://images.linuxcontainers.org/images/) | Official minimal rootfs archives of Debian, Ubuntu, Fedora, Arch and more: open `<distro>/<version>/amd64/default/<date>/` and download `rootfs.tar.xz` |
+| Community PS4 distros | Existing PS4 Linux rootfs archives (`.tar.xz`) |
+
+The archive must be a Linux root filesystem for x86_64 (amd64) packed as `.tar.xz`. ISO files do not work.
+
+Minimal archives start to a text login with no desktop. Plug in a network cable, log in, and install one, for example on Debian or Ubuntu:
+
+```bash
+sudo apt update && sudo apt install xfce4 lightdm
+```
+
+The PS4 GPU has no 3D driver, so light desktops (XFCE, LXQt, MATE) work best.
+
+## What the installer adds
+
+After unpacking an archive, the installer adds what the PS4 needs (all of it is inside `initramfs.cpio.gz`):
+
+- the PS4 kernel modules and extra firmware,
+- a service that keeps the PS4 Slim/Pro HDMI output on,
+- X display settings for the PS4 GPU (software rendering),
+- the hostname `<name>-ps4` and the root filesystem entry in `/etc/fstab`,
+- a login when the archive has none: user `<name>`, password `<name>` (root gets the same password).
+
+The distro's name and logo are found automatically: from the archive itself (read in the background while the menu is up), then from the installed system. A distro without a logo file shows the first letter of its name.
+
+## Logins
+
+Change the password right away with `passwd`.
+
+| Distro | User | Password |
+|---|---|---|
+| Kali Linux (from Releases) | `kali` | `kali` |
+| Parrot OS (from Releases) | `parrot` | `parrot` |
+| Any other archive with no user | `<name>` | `<name>` |
+
+The Kali and Parrot archives from Releases have the SSH server on, so anyone on your network can log in with the default password until you change it.
+
+## Everyday use
+
+Run the payload. With one distro installed it starts straight away; with more, the menu appears. Shut down or restart from Linux to go back to the PS4 system.
+
+## Add, reinstall or remove a distro
+
+- **Add:** copy its `<name>-ps4-rootfs.tar.xz` to `/user/home/`. It appears in the menu with **Install**.
+- **Reinstall:** delete `/user/home/<name>-ps4.img` over FTP.
+- **Remove:** delete `/user/home/<name>-ps4.img` and `/user/home/<name>-ps4-rootfs.tar.xz`.
+- **USB install:** reformat the drive on a PC.
+
+## Build from source
+
+You need a Linux PC with Docker, git, make and about 30 GB of free disk space.
+
+```bash
+make kernel initramfs        # PS4 kernel and the boot menu with the installer
+make rootfs DISTRO=kali      # out/kali-ps4-rootfs.tar.xz (XFCE desktop)
+make rootfs DISTRO=parrot    # out/parrot-ps4-rootfs.tar.xz (XFCE desktop)
+make ps4-files               # copies everything for the PS4 into ps4-files/
+```
+
+`make rootfs` is only needed to build ready-made desktop archives like the ones in Releases; the installer handles any other archive by itself. To build another one, create `config/<name>/` with a `distro.env` (Docker base image and default login) and two package lists. Debian-based distros work with the shared Dockerfile. Archives built this way carry their menu name and logo at the start (`etc/ps4-distro/`), so the menu shows them instantly.
+
+Kernel command-line options (in `bootargs.txt`):
+
+| Option | Effect |
+|---|---|
+| `ps4_default=<name>` | Card selected when the menu opens |
+| `ps4_root=LABEL=…` / `UUID=…` / `/dev/…` | Boot this root directly, no menu |
+| `ps4_rootwait=30` | Wait longer for a slow USB drive |
+| `ps4_rescue` | Open a shell before anything else |
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `initramfs/init` | Boot logic: finds distros, runs the menu, installs and sets up any rootfs for the PS4 |
+| `initramfs/fbui.c` | Menu and install screens, controller input, logo conversion, archive scanning |
+| `initramfs/blockmap.c` | Maps the image files on the PS4 drive without writing the PS4's file system |
+| `initramfs/ps4hdmi.c` | Keeps the PS4 Slim/Pro HDMI output on |
+| `initramfs/stb_image.h` | PNG and JPEG decoder for logos ([stb](https://github.com/nothings/stb), public domain / MIT) |
+| `patches/kernel/` | HDMI bridge fixes for the PS4 kernel |
+| `config/`, `docker/`, `scripts/`, `overlay/` | Build system and per-distro settings for the ready-made archives |
+| `assets/logos/`, `tools/` | Built-in logos, font and logo converters, HDMI bridge debugging tool |
+
+## License
+
+Copyright (C) 2026 [Chokri Hammedi (blue0x1)](https://github.com/blue0x1).
+
+The project code is GPL-2.0 (see `LICENSE`). `initramfs/stb_image.h` is public domain / MIT. The release files also contain the Linux kernel (GPLv2), BusyBox (GPLv2), XZ Utils and distro packages under their own licenses. Kali Linux, Parrot OS, Debian and other distro names and logos are trademarks of their owners; this project is not affiliated with them.

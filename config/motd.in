@@ -1,0 +1,8 @@
+
+  @NAME@ for PS4
+  By Chokri Hammedi (blue0x1) - https://github.com/blue0x1
+
+  SSH is ON (@USER@/@PASS@) - change the password now:  passwd
+  Turn SSH off:  sudo systemctl disable --now ssh
+  Connect Wi-Fi:  nmtui
+

@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+"""Keep the PS4 Slim/Pro HDMI bridge (MN864729) output on.
+
+After boot (and when the TV re-handshakes) the bridge can turn its HDMI output
+enables off (0x1e00 bit 0, 0x1e02 bits 4-6) and set the video mute
+(0x705f bit 7): the TV shows "No signal". Check every 3 s and turn it back on.
+Does nothing on fat CUH-10xx/11xx consoles (MN86471A) or without /dev/icc.
+"""
+import importlib.machinery
+import os
+import sys
+import time
+
+GPU = "/sys/bus/pci/devices/0000:00:01.0/device"
+try:
+    if open(GPU).read().strip() in ("0x9920",):
+        sys.exit(0)  # MN86471A bridge: not affected
+except OSError:
+    sys.exit(0)
+
+bridge = importlib.machinery.SourceFileLoader("ps4bridge", "/usr/local/sbin/ps4-bridge").load_module()
+fd = bridge.open_icc()
+
+while True:
+    try:
+        if not bridge.read(fd, 0x1e00)[0] & 0x01 or bridge.read(fd, 0x705f)[0] & 0x80:
+            bridge.mask(fd, 0x1e02, 0x70, 0x70)
+            bridge.mask(fd, 0x1e00, 0x01, 0x01)
+            bridge.write(fd, 0x705f, 0x10)
+            print("HDMI bridge output was off; turned it back on", flush=True)
+    except Exception as e:  # keep going; the bridge may be busy
+        print(f"bridge check failed: {e}", flush=True)
+    time.sleep(3)

@@ -1,0 +1,8 @@
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Extra packages for PROFILE=desktop. XFCE: the lightest Parrot desktop, and
+# the one that runs well with the PS4's software rendering.
+
+parrot-desktop-xfce
+xserver-xorg-video-amdgpu
+pipewire-pulse
+joystick
