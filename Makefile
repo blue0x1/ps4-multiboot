@@ -8,7 +8,7 @@
 DISTRO ?= kali
 export KERNEL_REPO KERNEL_BRANCH DISTRO PROFILE TOOLS
 
-.PHONY: all kernel initramfs rootfs ps4-files usb clean distclean
+.PHONY: all kernel initramfs rootfs mesa ps4-files usb clean distclean
 
 all: kernel initramfs rootfs
 
@@ -20,6 +20,10 @@ initramfs:
 
 rootfs:
 	scripts/build-rootfs.sh
+
+# PS4 Mesa (OpenGL and Vulkan for the PS4 GPU): out/ps4-mesa.tar.xz
+mesa:
+	scripts/build-mesa.sh
 
 # Copies a finished build into ps4-files/, laid out like the PS4's folders
 # (for the GitHub Release; not committed).

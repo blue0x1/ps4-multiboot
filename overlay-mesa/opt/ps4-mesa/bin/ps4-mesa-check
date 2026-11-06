@@ -1,0 +1,17 @@
+#!/bin/sh
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Prints whether OpenGL and Vulkan run on the PS4 GPU with the PS4 Mesa.
+# Needs eglinfo and vulkaninfo (Debian/Kali: apt install mesa-utils vulkan-tools).
+R=/opt/ps4-mesa/bin/ps4-mesa-run
+
+echo "== GPU"
+for d in /sys/class/drm/card[0-9]/device; do
+    [ -e "$d/device" ] && echo "$(cat "$d/vendor"):$(cat "$d/device") $(basename "$(readlink "$d/driver")")"
+done
+ls /dev/dri 2>/dev/null | tr '\n' ' '; echo
+
+echo "== OpenGL"
+$R eglinfo -B -p surfaceless 2>&1 | grep -E "core profile (renderer|version)" | head -2
+
+echo "== Vulkan"
+$R vulkaninfo --summary 2>&1 | grep -E "deviceName|driverInfo|apiVersion|ERROR" | head -4

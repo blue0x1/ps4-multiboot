@@ -1,0 +1,47 @@
+#!/bin/sh
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Makes the PS4 Mesa the system's OpenGL and Vulkan driver, and turns on GPU
+# acceleration for the desktop. Takes effect after a restart.
+#   sudo ps4-mesa-enable          enable
+#   sudo ps4-mesa-enable --undo   back to the distro's Mesa and software rendering
+set -e
+P=/opt/ps4-mesa
+X=/etc/X11/xorg.conf.d/20-ps4-gpu.conf
+ICD="$P/share/vulkan/icd.d/radeon_icd.x86_64.json"
+
+[ "$(id -u)" = 0 ] || { echo "Run it with sudo: sudo $0 $*" >&2; exit 1; }
+
+if [ "$1" = "--undo" ]; then
+    rm -f /etc/ld.so.conf.d/00-ps4-mesa.conf
+    sed -i '\|^VK_DRIVER_FILES=/opt/ps4-mesa/|d' /etc/environment
+    if [ -f "$X.software" ]; then mv "$X.software" "$X"; fi
+    ldconfig
+    echo "PS4 Mesa turned off. Restart to apply."
+    exit 0
+fi
+
+ls "$P"/lib/libgallium-*.so >/dev/null 2>&1 || { echo "$P is missing or incomplete" >&2; exit 1; }
+
+# 1. System libraries: the PS4 Mesa comes before the distro's Mesa.
+echo "$P/lib" > /etc/ld.so.conf.d/00-ps4-mesa.conf
+ldconfig
+
+# 2. Vulkan: use only the PS4 driver (the distro's RADV misreads the PS4 GPU).
+sed -i '/^VK_DRIVER_FILES=/d' /etc/environment
+echo "VK_DRIVER_FILES=$ICD" >> /etc/environment
+
+# 3. Desktop: GPU acceleration (glamor and DRI3) instead of software rendering.
+mkdir -p /etc/X11/xorg.conf.d
+if [ -f "$X" ] && [ ! -f "$X.software" ]; then cp "$X" "$X.software"; fi
+cat > "$X" <<'EOF'
+# PS4 Liverpool/Gladius GPU with the PS4 Mesa (/opt/ps4-mesa): GPU acceleration.
+# Undo: sudo /opt/ps4-mesa/bin/ps4-mesa-enable --undo
+Section "Device"
+    Identifier "PS4 GPU"
+    Driver     "modesetting"
+    Option     "AccelMethod" "glamor"
+    Option     "DRI"         "3"
+EndSection
+EOF
+
+echo "PS4 Mesa turned on. Restart to use the GPU for the desktop."

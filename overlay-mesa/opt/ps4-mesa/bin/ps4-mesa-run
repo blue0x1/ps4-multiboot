@@ -1,0 +1,13 @@
+#!/bin/sh
+# Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
+# Runs one program with the PS4 Mesa (OpenGL and Vulkan for the PS4 GPU),
+# without changing the system. Example: ps4-mesa-run vkcube
+P=/opt/ps4-mesa
+[ $# -gt 0 ] || { echo "usage: ps4-mesa-run PROGRAM [ARGS...]" >&2; exit 2; }
+
+export LD_LIBRARY_PATH="$P/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LIBGL_DRIVERS_PATH="$P/lib/dri"
+export GBM_BACKENDS_PATH="$P/lib/gbm"
+export __EGL_VENDOR_LIBRARY_FILENAMES="$P/share/glvnd/egl_vendor.d/50_mesa.json"
+export VK_DRIVER_FILES="$P/share/vulkan/icd.d/radeon_icd.x86_64.json"
+exec "$@"
