@@ -22,6 +22,10 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 - **Install to the PS4 or to a USB drive**, chosen per distro.
 - **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
 
+## Screenshots
+
+![The boot menu: two installed distros and one ready to install](docs/screenshots/menu.png)
+
 ## Requirements
 
 - A jailbroken PS4 with **GoldHEN** (for its FTP server and payload loader).
