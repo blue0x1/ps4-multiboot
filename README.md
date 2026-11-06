@@ -54,15 +54,38 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 You are free to use any distro. The only requirement: its root filesystem for x86_64 (amd64), packed as `.tar.xz`. ISO files do not work.
 
-For example, [images.linuxcontainers.org](https://images.linuxcontainers.org/images/) has official rootfs archives for many distros: open `<distro>/<version>/amd64/default/<date>/` and download `rootfs.tar.xz`. Existing PS4 Linux rootfs archives work too.
+Archives come in two kinds:
 
-Minimal archives start to a text login with no desktop. Plug in a network cable, log in, and install one, for example on Debian or Ubuntu:
+| Kind | Where to find it | What you get |
+|---|---|---|
+| **With a desktop** | Distros made for PS4 Linux, for example on [ps4linux.com/downloads](https://ps4linux.com/downloads/) | Boots straight to a desktop |
+| **Minimal** | Official rootfs archives, for example on [images.linuxcontainers.org](https://images.linuxcontainers.org/images/) (open `<distro>/<version>/amd64/default/<date>/` and download `rootfs.tar.xz`) | A text login; add a desktop yourself (below) |
+
+PS4 Linux distros built for an older kernel may include their own 3D graphics drivers; their desktop works, but those 3D features may not.
+
+### Adding a desktop to a minimal distro
+
+Plug in a network cable, log in, and install a desktop. Then restart, and the PS4 boots to a graphical login.
+
+Debian or Ubuntu:
 
 ```bash
 sudo apt update && sudo apt install xfce4 lightdm
 ```
 
-The PS4 GPU has no 3D driver, so light desktops (XFCE, LXQt, MATE) work best.
+Fedora:
+
+```bash
+sudo dnf install @xfce-desktop-environment && sudo systemctl set-default graphical.target
+```
+
+Arch:
+
+```bash
+sudo pacman -Syu xfce4 lightdm lightdm-gtk-greeter && sudo systemctl enable lightdm
+```
+
+If `sudo` is missing, run the same command after `su -` (the root password is the same as the user's, see [Logins](#logins)). The PS4 GPU has no 3D driver, so light desktops (XFCE, LXQt, MATE) work best.
 
 ## What the installer adds
 
@@ -78,7 +101,7 @@ The distro's name and logo are found automatically: from the archive itself (rea
 
 ## Logins
 
-If the archive has its own user, log in with it. If it has none, the installer creates one: user `<name>`, password `<name>` (for `debian-ps4-rootfs.tar.xz`: `debian` / `debian`). Change the password right away with `passwd`.
+If the archive has its own user, log in with it. If it has none, the installer creates one: user `<name>`, password `<name>` (for `debian-ps4-rootfs.tar.xz`: `debian` / `debian`), and gives root the same password. Change both right away with `passwd` and `sudo passwd root`.
 
 ## Everyday use
 
