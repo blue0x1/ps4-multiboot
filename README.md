@@ -68,7 +68,7 @@ PS4 Linux distros built for an older kernel may include their own 3D graphics dr
 
 ### Adding a desktop to a minimal distro
 
-Plug in a network cable, log in, and install a desktop. Then restart, and the PS4 boots to a graphical login.
+Plug in a network cable (or join [Wi-Fi](#wi-fi)), log in, and install a desktop. Then restart, and the PS4 boots to a graphical login.
 
 Debian or Ubuntu:
 
@@ -105,6 +105,26 @@ The distro's name and logo are found automatically: from the archive itself (rea
 ## Logins
 
 If the archive has its own user, log in with it. If it has none, the installer creates one: user `<name>`, password `<name>` (for `debian-ps4-rootfs.tar.xz`: `debian` / `debian`), and gives root the same password. Change both right away with `passwd` and `sudo passwd root`.
+
+## Wi-Fi
+
+A network cable works without any setup. To join Wi-Fi, open a terminal and run these two commands, with your own network name and password (distros with NetworkManager, which most desktop distros have):
+
+```bash
+sudo nmcli con add type wifi con-name home-wifi ifname wlan0 ssid "YOUR_WIFI_NAME" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "YOUR_WIFI_PASSWORD"
+sudo nmcli con up home-wifi
+```
+
+The PS4 joins it again at every boot. If it does not connect:
+
+- Turn off MAC address randomization, which the PS4 Wi-Fi chip often fails with, then run `sudo nmcli con up home-wifi` again:
+
+  ```bash
+  printf '[device]\nwifi.scan-rand-mac-address=no\n\n[connection]\nwifi.cloned-mac-address=preserve\n' | sudo tee /etc/NetworkManager/conf.d/90-ps4-wifi.conf
+  sudo systemctl restart NetworkManager
+  ```
+
+- Use your router's 2.4 GHz network if it has a separate one, and WPA2 rather than WPA3 only.
 
 ## Everyday use
 
