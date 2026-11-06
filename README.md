@@ -18,6 +18,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 - **Boot menu on the TV**: one card per distro with its own name and logo. Installed ones start with X, new ones install. The first installed distro starts by itself after 10 seconds.
 - **Any distro you choose**: drop in any x86_64 Linux rootfs archive (`.tar.xz`, `.tar.gz` or `.tar.bz2`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
+- **3D graphics**: OpenGL 4.5 and Vulkan 1.3 on the PS4 GPU, with the desktop accelerated, from an optional Mesa build for the PS4 (see [3D graphics](#3d-graphics)).
 - **Several distros side by side**, each in its own file on the PS4's internal drive (`/user/home/<name>-ps4.img`). The PS4 system software and its other data are not touched, and nothing is repartitioned.
 - **Install to the PS4 or to a USB drive**, chosen per distro.
 - **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
@@ -35,7 +36,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 ## Install
 
-1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`.
+1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`, and `ps4-mesa.tar.xz` for 3D graphics (optional, recommended).
 
 2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz` (or `.tar.gz`, `.tar.bz2`, keeping its own extension), for example `debian-ps4-rootfs.tar.xz` (see [Choosing a distro](#choosing-a-distro)).
 
@@ -45,6 +46,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
    |---|---|
    | `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` | `/data/linux/boot/` |
    | `<name>-ps4-rootfs.tar.xz` / `.tar.gz` / `.tar.bz2` (one per distro) | `/user/home/` |
+   | `ps4-mesa.tar.xz` (optional, 3D graphics) | `/user/home/` |
    | `linux-2048mb.bin` | `/data/payloads/` |
 
 4. Run `linux-2048mb.bin` from GoldHEN's payload menu.
@@ -88,7 +90,7 @@ Arch:
 sudo pacman -Syu xfce4 lightdm lightdm-gtk-greeter && sudo systemctl enable lightdm
 ```
 
-If `sudo` is missing, run the same command after `su -` (the root password is the same as the user's, see [Logins](#logins)). The PS4 GPU has no 3D driver, so light desktops (XFCE, LXQt, MATE) work best.
+If `sudo` is missing, run the same command after `su -` (the root password is the same as the user's, see [Logins](#logins)). Light desktops (XFCE, LXQt, MATE) work best, especially without [3D graphics](#3d-graphics).
 
 ## What the installer adds
 
@@ -96,11 +98,28 @@ After unpacking an archive, the installer adds what the PS4 needs (all of it is 
 
 - the PS4 kernel modules and extra firmware,
 - a service that keeps the PS4 Slim/Pro HDMI output on,
-- X display settings for the PS4 GPU (software rendering),
+- X display settings for the PS4 GPU,
+- 3D graphics, when `ps4-mesa.tar.xz` is in `/user/home/` (see below),
 - the hostname `<name>-ps4` and the root filesystem entry in `/etc/fstab`,
 - a login when the archive has none: user `<name>`, password `<name>` (root gets the same password).
 
 The distro's name and logo are found automatically: from the archive itself (read in the background while the menu is up), then from the installed system. A distro without a logo file shows the first letter of its name.
+
+## 3D graphics
+
+The standard Mesa graphics driver in distros does not recognize the PS4 GPU, so on its own a distro draws everything in software. `ps4-mesa.tar.xz` from the Releases page is Mesa built with patches for the PS4 GPU (Liverpool on the PS4 and Slim, Gladius on the Pro). With it you get OpenGL 4.5, Vulkan 1.3 and a GPU-accelerated desktop. It installs into `/opt/ps4-mesa` and leaves the distro's own Mesa untouched.
+
+- **New installs:** copy `ps4-mesa.tar.xz` to `/user/home/` once. Every distro installed after that gets it automatically.
+- **A distro that is already installed:** copy `ps4-mesa.tar.xz` into it (with `scp`, `wget` or a USB stick), then run this and restart:
+
+  ```bash
+  sudo tar -xJf ps4-mesa.tar.xz -C / && sudo /opt/ps4-mesa/bin/ps4-mesa-enable
+  ```
+
+- **Check it:** `/opt/ps4-mesa/bin/ps4-mesa-check` (needs `mesa-utils` and `vulkan-tools`) shows the PS4 GPU for OpenGL and Vulkan.
+- **Turn it off:** `sudo /opt/ps4-mesa/bin/ps4-mesa-enable --undo`, then restart.
+
+It needs glibc 2.38 or newer, which current distros have (Debian 13, Ubuntu 24.04, Kali, Parrot 7, Fedora 39, Arch and newer). The installer skips it on older distros, which keep software rendering. Tested on a PS4 Pro; the PS4 and PS4 Slim GPU use the same patches.
 
 ## Logins
 
@@ -143,6 +162,7 @@ You need a Linux PC with Docker, git, make and about 30 GB of free disk space.
 
 ```bash
 make kernel initramfs        # PS4 kernel and the boot menu with the installer
+make mesa                    # 3D graphics: out/ps4-mesa.tar.xz
 make ps4-files               # copies the files for the PS4 into ps4-files/
 ```
 
@@ -167,6 +187,7 @@ Kernel command-line options (in `bootargs.txt`):
 | `initramfs/ps4hdmi.c` | Keeps the PS4 Slim/Pro HDMI output on |
 | `initramfs/stb_image.h` | PNG and JPEG decoder for logos ([stb](https://github.com/nothings/stb), public domain / MIT) |
 | `patches/kernel/` | HDMI bridge fixes for the PS4 kernel |
+| `patches/mesa/`, `overlay-mesa/` | Mesa patches for the PS4 GPU, and the `ps4-mesa-*` helpers in the 3D graphics bundle |
 | `config/`, `docker/`, `scripts/`, `overlay/` | Build system, and settings for the optional `make rootfs` archives |
 | `assets/logos/`, `tools/` | Built-in logos, font and logo converters, HDMI bridge debugging tool |
 

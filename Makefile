@@ -31,6 +31,7 @@ ps4-files:
 	mkdir -p ps4-files/data/linux/boot ps4-files/user/home
 	cp out/bzImage out/initramfs.cpio.gz config/bootargs.txt ps4-files/data/linux/boot/
 	cp out/*-ps4-rootfs.tar.xz ps4-files/user/home/
+	[ ! -f out/ps4-mesa.tar.xz ] || cp out/ps4-mesa.tar.xz ps4-files/user/home/
 	cp out/kernel.info ps4-files/
 
 usb:

@@ -362,6 +362,52 @@ in_root() {
     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin chroot /newroot "$@"
 }
 
+# 3D graphics (OpenGL and Vulkan on the PS4 GPU) come from the PS4 Mesa
+# bundle, when the user copied it to /user/home/ps4-mesa.tar.xz. Called while
+# the PS4 drive is still mounted, only for an install; the copy goes to RAM.
+MESA=""
+mesa_pick() {
+    MESA=""
+    if [ -f /ps4hdd/home/ps4-mesa.tar.xz ] && cp /ps4hdd/home/ps4-mesa.tar.xz /run/ps4-mesa.tar.xz; then
+        MESA=/run/ps4-mesa.tar.xz
+        msg "3D graphics: using /user/home/ps4-mesa.tar.xz"
+    fi
+    return 0
+}
+
+# Does the new root have glibc 2.38 or newer (what the PS4 Mesa needs)?
+root_glibc_ok() {
+    for f in usr/lib/x86_64-linux-gnu/libc.so.6 lib/x86_64-linux-gnu/libc.so.6 usr/lib64/libc.so.6 usr/lib/libc.so.6; do
+        [ -f "/newroot/$f" ] && { grep -q 'GLIBC_2\.38' "/newroot/$f"; return; }
+    done
+    return 1
+}
+
+# Adds the PS4 Mesa to the new root and makes it the system's driver, with
+# GPU acceleration for the desktop. Without it (or with an older glibc) the
+# distro keeps software rendering.
+mesa_setup() {
+    [ -n "$MESA" ] || return 0
+    if ! root_glibc_ok; then
+        msg "3D graphics: $DNAME has glibc older than 2.38, keeping software rendering"
+        return 0
+    fi
+    ui_busy "Adding 3D graphics for the PS4 GPU..."
+    rm -rf /newroot/opt/ps4-mesa
+    mkdir -p /newroot/opt
+    if unpack "$MESA" mt < "$MESA" | tar -x -C /newroot \
+       && in_root /opt/ps4-mesa/bin/ps4-mesa-enable > /dev/kmsg 2>&1; then
+        msg "3D graphics: PS4 Mesa added"
+    else
+        msg "3D graphics: could not add the PS4 Mesa, keeping software rendering"
+        [ -x /newroot/opt/ps4-mesa/bin/ps4-mesa-enable ] \
+            && in_root /opt/ps4-mesa/bin/ps4-mesa-enable --undo > /dev/kmsg 2>&1
+        rm -rf /newroot/opt/ps4-mesa
+    fi
+    ui_busy_end
+    return 0
+}
+
 ps4_setup() {
     r=/newroot; k="$(uname -r)"; l="$(newroot_lib)"
     msg "PS4 setup for $DNAME"
@@ -385,11 +431,13 @@ ps4_setup() {
         ln -sf ../ps4-hdmi-keepalive.service "$r/etc/systemd/system/multi-user.target.wants/"
     fi
 
-    # The PS4 GPU has no 3D driver: X with software rendering.
+    # X display settings: software rendering, since the distro's own Mesa
+    # misreads the PS4 GPU. mesa_setup switches it to the GPU when it can.
     if [ ! -e "$r/etc/X11/xorg.conf.d/20-ps4-gpu.conf" ]; then
         mkdir -p "$r/etc/X11/xorg.conf.d"
         cp "$KIT/20-ps4-gpu.conf" "$r/etc/X11/xorg.conf.d/"
     fi
+    mesa_setup
 
     # Menu name and logo, kept in the installed system (the menu reads them
     # from there on later boots). Our archives already have them.
@@ -571,6 +619,7 @@ usb_install() {
         ui_error "Installation failed: could not read /user/$HDD_TAR"
         return 1
     fi
+    mesa_pick
     scan_stop
     umount /ps4hdd
     if ! dmsetup --noudevsync create disttar < /run/dist-tar.table > /dev/kmsg 2>&1; then
@@ -639,6 +688,11 @@ hdd_boot() {
     tar_size=""
     if [ -f "/ps4hdd/$HDD_TAR" ] && blockmap "/ps4hdd/$HDD_TAR" /dev/mapper/ps4hdd > /run/dist-tar.table; then
         tar_size=$(stat -c %s "/ps4hdd/$HDD_TAR")
+    fi
+    # An install follows when the image is not ext4 yet: get its 3D graphics
+    # bundle while the PS4 filesystem is still mounted.
+    if [ -n "$tar_size" ] && [ "$(dd if="/ps4hdd/$HDD_IMG" bs=1 skip=1080 count=2 2>/dev/null | hexdump -v -e '/1 "%02x"')" != 53ef ]; then
+        mesa_pick
     fi
     # Done with the PS4 filesystem (read-only the whole time).
     scan_stop
