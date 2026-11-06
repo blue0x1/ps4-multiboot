@@ -2,20 +2,18 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-PS4-003791?logo=playstation&logoColor=white" alt="Platform: PS4">
-  <img src="https://img.shields.io/badge/Kali-Linux-557C94?logo=kalilinux&logoColor=white" alt="Kali Linux">
-  <img src="https://img.shields.io/badge/Parrot-OS-15E0ED?logo=parrotsecurity&logoColor=white" alt="Parrot OS">
-  <img src="https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white" alt="Debian">
+  <img src="https://img.shields.io/badge/distro-any-2ea043?logo=linux&logoColor=white" alt="Distro: any">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-blue" alt="License: GPL-2.0"></a>
 </p>
 
-One menu to install and boot several Linux distros on a jailbroken PlayStation 4, all from the controller. Copy a distro's rootfs archive to the PS4 and it appears in the menu, ready to install. The installer adds everything the PS4 needs by itself. No PC tools, partitioning or USB stick are needed.
+One menu to install and boot Linux on a jailbroken PlayStation 4, all from the controller. Use any distro you like: copy its rootfs archive to the PS4 and it appears in the menu, ready to install. The installer adds everything the PS4 needs by itself. No PC tools, partitioning or USB stick are needed.
 
 Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on [Kali Linux for PS4](https://github.com/blue0x1/kali-ps4).
 
 ## Features
 
 - **Boot menu on the TV**: one card per distro with its own name and logo. Installed ones start with X, new ones install. The first installed distro starts by itself after 10 seconds.
-- **Any distro**: drop in any x86_64 Linux rootfs archive (`.tar.xz`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
+- **Any distro you choose**: drop in any x86_64 Linux rootfs archive (`.tar.xz`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
 - **Several distros side by side**, each in its own file on the PS4's internal drive (`/user/home/<name>-ps4.img`). The PS4 system software and its other data are not touched, and nothing is repartitioned.
 - **Install to the PS4 or to a USB drive**, chosen per distro.
 - **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
@@ -32,7 +30,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`.
 
-2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz`, for example `debian-ps4-rootfs.tar.xz` (see [Where to get distros](#where-to-get-distros)).
+2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz`, for example `debian-ps4-rootfs.tar.xz` (see [Choosing a distro](#choosing-a-distro)).
 
 3. Turn on GoldHEN's FTP server and copy the files to the PS4 (port 2121):
 
@@ -48,15 +46,11 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 5. In the menu, pick a distro, then **Install to PS4** or **Install to USB drive**. A full desktop distro takes about 10 to 15 minutes, a minimal one a few minutes.
 
-## Where to get distros
+## Choosing a distro
 
-| Source | What you get |
-|---|---|
-| This project's Releases | **Kali Linux** and **Parrot OS** with the XFCE desktop, ready to use |
-| [images.linuxcontainers.org](https://images.linuxcontainers.org/images/) | Official minimal rootfs archives of Debian, Ubuntu, Fedora, Arch and more: open `<distro>/<version>/amd64/default/<date>/` and download `rootfs.tar.xz` |
-| Community PS4 distros | Existing PS4 Linux rootfs archives (`.tar.xz`) |
+You are free to use any distro. The only requirement: its root filesystem for x86_64 (amd64), packed as `.tar.xz`. ISO files do not work.
 
-The archive must be a Linux root filesystem for x86_64 (amd64) packed as `.tar.xz`. ISO files do not work.
+For example, [images.linuxcontainers.org](https://images.linuxcontainers.org/images/) has official rootfs archives for many distros: open `<distro>/<version>/amd64/default/<date>/` and download `rootfs.tar.xz`. Existing PS4 Linux rootfs archives work too.
 
 Minimal archives start to a text login with no desktop. Plug in a network cable, log in, and install one, for example on Debian or Ubuntu:
 
@@ -80,15 +74,7 @@ The distro's name and logo are found automatically: from the archive itself (rea
 
 ## Logins
 
-Change the password right away with `passwd`.
-
-| Distro | User | Password |
-|---|---|---|
-| Kali Linux (from Releases) | `kali` | `kali` |
-| Parrot OS (from Releases) | `parrot` | `parrot` |
-| Any other archive with no user | `<name>` | `<name>` |
-
-The Kali and Parrot archives from Releases have the SSH server on, so anyone on your network can log in with the default password until you change it.
+If the archive has its own user, log in with it. If it has none, the installer creates one: user `<name>`, password `<name>` (for `debian-ps4-rootfs.tar.xz`: `debian` / `debian`). Change the password right away with `passwd`.
 
 ## Everyday use
 
@@ -107,12 +93,10 @@ You need a Linux PC with Docker, git, make and about 30 GB of free disk space.
 
 ```bash
 make kernel initramfs        # PS4 kernel and the boot menu with the installer
-make rootfs DISTRO=kali      # out/kali-ps4-rootfs.tar.xz (XFCE desktop)
-make rootfs DISTRO=parrot    # out/parrot-ps4-rootfs.tar.xz (XFCE desktop)
-make ps4-files               # copies everything for the PS4 into ps4-files/
+make ps4-files               # copies the files for the PS4 into ps4-files/
 ```
 
-`make rootfs` is only needed to build ready-made desktop archives like the ones in Releases; the installer handles any other archive by itself. To build another one, create `config/<name>/` with a `distro.env` (Docker base image and default login) and two package lists. Debian-based distros work with the shared Dockerfile. Archives built this way carry their menu name and logo at the start (`etc/ps4-distro/`), so the menu shows them instantly.
+Optional: `make rootfs DISTRO=<name>` builds a rootfs archive with a desktop already installed, from a folder in `config/` (Docker base image, default login and package lists). Archives built this way carry their menu name and logo at the start (`etc/ps4-distro/`), so the menu shows them instantly.
 
 Kernel command-line options (in `bootargs.txt`):
 
@@ -133,11 +117,11 @@ Kernel command-line options (in `bootargs.txt`):
 | `initramfs/ps4hdmi.c` | Keeps the PS4 Slim/Pro HDMI output on |
 | `initramfs/stb_image.h` | PNG and JPEG decoder for logos ([stb](https://github.com/nothings/stb), public domain / MIT) |
 | `patches/kernel/` | HDMI bridge fixes for the PS4 kernel |
-| `config/`, `docker/`, `scripts/`, `overlay/` | Build system and per-distro settings for the ready-made archives |
+| `config/`, `docker/`, `scripts/`, `overlay/` | Build system, and settings for the optional `make rootfs` archives |
 | `assets/logos/`, `tools/` | Built-in logos, font and logo converters, HDMI bridge debugging tool |
 
 ## License
 
 Copyright (C) 2026 [Chokri Hammedi (blue0x1)](https://github.com/blue0x1).
 
-The project code is GPL-2.0 (see `LICENSE`). `initramfs/stb_image.h` is public domain / MIT. The release files also contain the Linux kernel (GPLv2), BusyBox (GPLv2), XZ Utils and distro packages under their own licenses. Kali Linux, Parrot OS, Debian and other distro names and logos are trademarks of their owners; this project is not affiliated with them.
+The project code is GPL-2.0 (see `LICENSE`). `initramfs/stb_image.h` is public domain / MIT. The release files also contain the Linux kernel (GPLv2), BusyBox (GPLv2), XZ Utils and distro packages under their own licenses. Distro names and logos are trademarks of their owners; this project is not affiliated with them.
