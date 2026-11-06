@@ -1,4 +1,4 @@
-<h1 align="center">Linux for PS4</h1>
+<h1 align="center">PS4 Multiboot</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-PS4-003791?logo=playstation&logoColor=white" alt="Platform: PS4">

@@ -95,7 +95,7 @@ static uint32_t *bb, *bb_static;
 static int W, H;
 static uint32_t aw, ah;
 static unsigned char *avatar;
-static const char *title_text = "Linux for PS4";
+static const char *title_text = "PS4 Multiboot";
 static const char *distro_name = "Linux";
 
 static void set_kd(int mode)

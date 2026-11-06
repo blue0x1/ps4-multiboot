@@ -1,6 +1,6 @@
 #!/bin/busybox sh
 # Copyright (C) 2026 Chokri Hammedi (blue0x1) <https://github.com/blue0x1>
-# PS4 multiboot initramfs: find every Linux installed on the PS4 drive or on a
+# PS4 Multiboot initramfs: find every Linux installed on the PS4 drive or on a
 # USB drive, show the boot menu, then install or boot the chosen one.
 #
 # A distro is identified by its short name (kali, parrot, ...):
@@ -708,7 +708,7 @@ show_banner() {
         # Logo ends at 8% + 270 px; text starts two rows under it.
         top=$(( (rows * 8 / 100) + 270 / 16 + 2 ))
     fi
-    for line in "Linux for PS4" "Credits: blue0x1"; do
+    for line in "PS4 Multiboot" "Credits: blue0x1"; do
         pad=$(( (cols - ${#line}) / 2 )); [ "$pad" -gt 0 ] || pad=0
         printf '\033[%d;%dH%s' "$top" "$((pad + 1))" "$line" > /dev/console
         top=$((top + 1))
@@ -816,7 +816,7 @@ while ! grep -q ' /newroot ' /proc/mounts; do
         done
         set -- "$@" "-|Reboot|Restart the PS4|r"
         if [ -x /bin/fbui ]; then
-            fbui menu - "$def" "$timeout" "$@"
+            FBUI_TITLE="PS4 Multiboot" fbui menu - "$def" "$timeout" "$@"
             pick=$?
         else
             pick=$def
