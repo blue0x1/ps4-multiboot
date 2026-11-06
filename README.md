@@ -21,7 +21,6 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 - **Several distros side by side**, each in its own file on the PS4's internal drive (`/user/home/<name>-ps4.img`). The PS4 system software and its other data are not touched, and nothing is repartitioned.
 - **Install to the PS4 or to a USB drive**, chosen per distro.
 - **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
-- **Works with Kali for PS4 installs**: an existing `/user/home/kali-ps4.img` shows up in the menu as is.
 
 ## Requirements
 
