@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.png" alt="PS4 Multiboot" width="100%">
+</p>
+
 <h1 align="center">PS4 Multiboot</h1>
 
 <p align="center">
