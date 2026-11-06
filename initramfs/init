@@ -4,7 +4,8 @@
 # USB drive, show the boot menu, then install or boot the chosen one.
 #
 # A distro is identified by its short name (kali, parrot, ...):
-#   /user/home/<name>-ps4-rootfs.tar.xz   archive to install from (copied over FTP)
+#   /user/home/<name>-ps4-rootfs.tar.xz   archive to install from (copied over FTP;
+#                                         .tar.gz and .tar.bz2 work too)
 #   /user/home/<name>-ps4.img             installed on the PS4 drive
 #   ext4 labeled <NAME>-PS4               installed on a USB drive
 #
@@ -74,6 +75,25 @@ rescue_shell() {
 # logo. Older archives without them use the names and logos built in here.
 LOGOS=/etc/ps4/logos
 META=/run/meta
+ARCHIVE_EXTS="tar.xz tar.gz tar.bz2"
+
+# The archive file of distro $1 on the PS4 drive (any supported extension).
+archive_of() {
+    for e in $ARCHIVE_EXTS; do
+        [ -f "/ps4hdd/home/$1-ps4-rootfs.$e" ] && { echo "/ps4hdd/home/$1-ps4-rootfs.$e"; return 0; }
+    done
+    return 1
+}
+
+# Decompresses stdin to stdout, by the extension of archive $1. "mt" as $2
+# uses all CPU cores where possible (XZ Utils).
+unpack() {
+    case "$1" in
+        *.gz)  gzip -dc ;;
+        *.bz2) bzip2 -dc ;;
+        *)     if [ "$2" = mt ] && [ -x /bin/xz-mt ]; then xz-mt -T0 -dc; else xz -dc; fi ;;
+    esac
+}
 
 # The distro's own logo inside a root filesystem ($1): the icon named by
 # LOGO= in os-release, else <id>-logo, distributor-logo-<id> or <id> (PNG or
@@ -97,7 +117,7 @@ find_logo() {
 meta_from_archive() {
     [ -s "$META/$1/etc/ps4-distro/name" ] && [ -s "$META/$1/etc/ps4-distro/logo.rgba" ] && return 0
     mkdir -p "$META/$1"
-    head -c 4194304 "$2" | xz -dc 2>/dev/null | tar -x -C "$META/$1" ./etc/ps4-distro 2>/dev/null
+    head -c 4194304 "$2" | unpack "$2" 2>/dev/null | tar -x -C "$META/$1" ./etc/ps4-distro 2>/dev/null
     return 0
 }
 
@@ -113,8 +133,7 @@ scan_archive() {
     mkdir -p "$d/etc/ps4-distro"
     touch "$d/scan.started"
     (
-        x=xz; [ -x /bin/xz-mt ] && x="xz-mt -T0"
-        $x -dc "$2" 2>/dev/null | fbui scan "$d/scan" etc/os-release usr/lib/os-release \
+        unpack "$2" mt < "$2" 2>/dev/null | fbui scan "$d/scan" etc/os-release usr/lib/os-release \
             'usr/share/pixmaps/*' 'usr/share/icons/*logo*' 2>/dev/null
         src="$(find_logo "$d/scan")" && fbui logo "$src" "$d/logo.tmp" > /dev/null 2>&1 \
             && mv "$d/logo.tmp" "$d/etc/ps4-distro/logo.rgba"
@@ -190,6 +209,7 @@ select_distro() {
     DLABEL="$(echo "$1" | tr a-z A-Z | cut -c1-12)-PS4"   # ext4 labels: 16 characters
     HDD_IMG="home/$1-ps4.img"
     HDD_TAR="home/$1-ps4-rootfs.tar.xz"
+    a="$(archive_of "$1")" && HDD_TAR="${a#/ps4hdd/}"
     UI_IMG="$(logo_of "$1")"
     export FBUI_TITLE="$DNAME for PS4" FBUI_NAME="$DNAME"
     ui_asked=0
@@ -486,7 +506,7 @@ first_boot_install() {
         || { ui_error "Installation failed: could not mount the $DNAME disk"; return 1; }
 
     if head -c "$tar_size" /dev/mapper/disttar | ui_progress "$from" 100 "$tar_size" "Installing $DNAME" \
-       | xz -dc | tar -x -C /newroot && flatten_root && has_init; then
+       | unpack "$HDD_TAR" | tar -x -C /newroot && flatten_root && has_init; then
         ps4_setup
         ui_busy "Finishing: writing data to the PS4 drive..."
         sync
@@ -573,7 +593,7 @@ usb_install() {
         ui_error "Installation failed: could not mount the USB drive"
     elif head -c "$tsize" /dev/mapper/disttar \
             | ui_progress 0 100 "$tsize" "Installing $DNAME onto the USB drive" \
-            | xz -dc | tar -x -C /newroot && flatten_root && has_init; then
+            | unpack "$HDD_TAR" | tar -x -C /newroot && flatten_root && has_init; then
         ps4_setup
         ui_busy "Finishing: writing data to the USB drive..."
         sync
@@ -772,11 +792,13 @@ while ! grep -q ' /newroot ' /proc/mounts; do
             entries="${entries}b|$id|hdd|
 "
             meta_from_root "$id" "$f"
-            [ -f "/ps4hdd/home/$id-ps4-rootfs.tar.xz" ] && meta_from_archive "$id" "/ps4hdd/home/$id-ps4-rootfs.tar.xz"
+            a="$(archive_of "$id")" && meta_from_archive "$id" "$a"
         done
-        for f in /ps4hdd/home/*-ps4-rootfs.tar.xz; do
+        for f in /ps4hdd/home/*-ps4-rootfs.tar.xz /ps4hdd/home/*-ps4-rootfs.tar.gz /ps4hdd/home/*-ps4-rootfs.tar.bz2; do
             [ -f "$f" ] || continue
-            id="${f##*/}"; id="${id%-ps4-rootfs.tar.xz}"
+            id="${f##*/}"; id="${id%-ps4-rootfs.tar.*}"
+            # Two archives of the same distro: use the first (archive_of order).
+            [ "$(archive_of "$id")" = "$f" ] || continue
             [ -f "/ps4hdd/home/$id-ps4.img" ] && continue
             entries="${entries}i|$id|hdd|
 "
@@ -790,7 +812,7 @@ while ! grep -q ' /newroot ' /proc/mounts; do
 
     if [ "$count" = 0 ]; then
         hdd_close
-        rescue_shell "no Linux install or archive found (copy <name>-ps4-rootfs.tar.xz to /user/home)"
+        rescue_shell "no Linux install or archive found (copy <name>-ps4-rootfs.tar.xz or .tar.gz to /user/home)"
         continue
     fi
 

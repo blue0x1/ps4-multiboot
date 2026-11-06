@@ -17,7 +17,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 ## Features
 
 - **Boot menu on the TV**: one card per distro with its own name and logo. Installed ones start with X, new ones install. The first installed distro starts by itself after 10 seconds.
-- **Any distro you choose**: drop in any x86_64 Linux rootfs archive (`.tar.xz`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
+- **Any distro you choose**: drop in any x86_64 Linux rootfs archive (`.tar.xz`, `.tar.gz` or `.tar.bz2`). The installer adds the PS4 kernel modules and firmware, the HDMI fix, the display settings and a login.
 - **Several distros side by side**, each in its own file on the PS4's internal drive (`/user/home/<name>-ps4.img`). The PS4 system software and its other data are not touched, and nothing is repartitioned.
 - **Install to the PS4 or to a USB drive**, chosen per distro.
 - **Controller support**: a DualShock 4 on a USB cable (left/right to choose, X to confirm, Circle to go back) or a USB keyboard.
@@ -33,14 +33,14 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`.
 
-2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz`, for example `debian-ps4-rootfs.tar.xz` (see [Choosing a distro](#choosing-a-distro)).
+2. Get the rootfs archive of each distro you want and name it `<name>-ps4-rootfs.tar.xz` (or `.tar.gz`, `.tar.bz2`, keeping its own extension), for example `debian-ps4-rootfs.tar.xz` (see [Choosing a distro](#choosing-a-distro)).
 
 3. Turn on GoldHEN's FTP server and copy the files to the PS4 (port 2121):
 
    | File | Folder on the PS4 |
    |---|---|
    | `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` | `/data/linux/boot/` |
-   | `<name>-ps4-rootfs.tar.xz` (one per distro) | `/user/home/` |
+   | `<name>-ps4-rootfs.tar.xz` / `.tar.gz` / `.tar.bz2` (one per distro) | `/user/home/` |
    | `linux-2048mb.bin` | `/data/payloads/` |
 
 4. Run `linux-2048mb.bin` from GoldHEN's payload menu.
@@ -51,7 +51,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 ## Choosing a distro
 
-You are free to use any distro. The only requirement: its root filesystem for x86_64 (amd64), packed as `.tar.xz`. ISO files do not work.
+You are free to use any distro. The only requirement: its root filesystem for x86_64 (amd64), packed as `.tar.xz`, `.tar.gz` or `.tar.bz2`. ISO files do not work.
 
 Archives come in two kinds:
 
@@ -108,9 +108,9 @@ Run the payload. With one distro installed it starts straight away; with more, t
 
 ## Add, reinstall or remove a distro
 
-- **Add:** copy its `<name>-ps4-rootfs.tar.xz` to `/user/home/`. It appears in the menu with **Install**.
+- **Add:** copy its `<name>-ps4-rootfs.tar.xz` (or `.tar.gz`, `.tar.bz2`) to `/user/home/`. It appears in the menu with **Install**.
 - **Reinstall:** delete `/user/home/<name>-ps4.img` over FTP.
-- **Remove:** delete `/user/home/<name>-ps4.img` and `/user/home/<name>-ps4-rootfs.tar.xz`.
+- **Remove:** delete `/user/home/<name>-ps4.img` and its `<name>-ps4-rootfs` archive.
 - **USB install:** reformat the drive on a PC.
 
 ## Build from source
