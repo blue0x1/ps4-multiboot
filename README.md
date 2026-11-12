@@ -198,7 +198,6 @@ Kernel command-line options (in `bootargs.txt`):
 PS4 Multiboot builds on the work of others:
 
 - [ps4-linux](https://github.com/sony-jaguar-devs/ps4-linux) (branch `7.0-Clean`): the PS4 Linux kernel. Its release files are built from it with the patches in `patches/kernel/`.
-- [rmuxnet's Linux kernel](https://gitlab.com/rmuxnet/linux): Baikal southbridge support; the AHCI polling in `patches/kernel/0003` comes from it.
 - [Mesa](https://mesa3d.org/): the optional 3D graphics bundle, with the patches in `patches/mesa/`.
 - [GoldHEN](https://github.com/GoldHEN/GoldHEN): the jailbreak, FTP server and payload loader this project relies on.
 - [BusyBox](https://busybox.net/), [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup), [e2fsprogs](https://e2fsprogs.sourceforge.net/), [util-linux](https://github.com/util-linux/util-linux) and [XZ Utils](https://tukaani.org/xz/): tools inside the boot image.
