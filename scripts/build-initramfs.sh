@@ -10,20 +10,21 @@ ensure_builder
 # initramfs. Anything we shipped under lib/firmware/amdgpu would overwrite it.
 
 # e2fsck (repairs the root filesystem after hard power-offs), mke2fs
-# (first-boot install) and cryptsetup + dmsetup (boot from the PS4 internal
-# drive), with their libraries, all from a distro rootfs image so the
+# (first-boot install), cryptsetup + dmsetup (boot from the PS4 internal
+# drive) and blkid (finds distros installed on USB drives by their label;
+# busybox has no blkid), with their libraries, all from a distro rootfs image so the
 # libraries match. Falls back to the builder image
-# (e2fsck only) if the rootfs image hasn't been built yet.
+# (e2fsck and blkid only) if the rootfs image hasn't been built yet.
 EXTRA="$BUILD/initramfs-extra"
 rm -rf "$EXTRA"
 mkdir -p "$EXTRA"
 # Any built distro image works; Kali's is the default.
 if docker image inspect "$ROOTFS_IMAGE" >/dev/null 2>&1 || \
    { ROOTFS_IMAGE="$(docker images --format '{{.Repository}}' | grep -m1 -- '-ps4-rootfs$')" && [ -n "$ROOTFS_IMAGE" ]; }; then
-    SRC_IMAGE="$ROOTFS_IMAGE"; BINS="e2fsck mke2fs cryptsetup dmsetup xz"
+    SRC_IMAGE="$ROOTFS_IMAGE"; BINS="e2fsck mke2fs cryptsetup dmsetup xz blkid"
 else
-    SRC_IMAGE="$BUILDER_IMAGE"; BINS="e2fsck"
-    log "No $ROOTFS_IMAGE image yet: initramfs gets e2fsck only (no internal-drive install)"
+    SRC_IMAGE="$BUILDER_IMAGE"; BINS="e2fsck blkid"
+    log "No $ROOTFS_IMAGE image yet: initramfs gets e2fsck and blkid only (no internal-drive install)"
 fi
 docker run --rm -v "$EXTRA:/x" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e BINS="$BINS" \
     "$SRC_IMAGE" sh -euc '
