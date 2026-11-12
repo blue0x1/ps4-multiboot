@@ -34,6 +34,8 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 - About 28 GB free on the PS4 for each distro installed on it (a 16 GB disk, and 10 GB always left free for the PS4), or a USB drive of 8 GB or more per distro.
 - Optional: a DualShock 4 with a USB cable, or a USB keyboard.
 
+Consoles: tested on the PS4 Pro (Belize southbridge). Later Slims and Pros with the Baikal southbridge (many CUH-21xx/22xx and CUH-71xx/72xx) are experimental: Linux starts and the display works, but USB drives may not be writable yet. The original PS4 (CUH-10xx/11xx, Aeolia) is not tested yet.
+
 ## Install
 
 1. Download from the Releases page: `bzImage`, `initramfs.cpio.gz`, `bootargs.txt` and `linux-2048mb.bin`, and `ps4-mesa.tar.xz` for 3D graphics (optional, recommended).
@@ -186,10 +188,21 @@ Kernel command-line options (in `bootargs.txt`):
 | `initramfs/blockmap.c` | Maps the image files on the PS4 drive without writing the PS4's file system |
 | `initramfs/ps4hdmi.c` | Keeps the PS4 Slim/Pro HDMI output on |
 | `initramfs/stb_image.h` | PNG and JPEG decoder for logos ([stb](https://github.com/nothings/stb), public domain / MIT) |
-| `patches/kernel/` | HDMI bridge fixes for the PS4 kernel |
+| `patches/kernel/` | HDMI bridge fixes and Baikal southbridge support for the PS4 kernel |
 | `patches/mesa/`, `overlay-mesa/` | Mesa patches for the PS4 GPU, and the `ps4-mesa-*` helpers in the 3D graphics bundle |
 | `config/`, `docker/`, `scripts/`, `overlay/` | Build system, and settings for the optional `make rootfs` archives |
 | `assets/logos/`, `tools/` | Built-in logos, font and logo converters, HDMI bridge debugging tool |
+
+## Credits
+
+PS4 Multiboot builds on the work of others:
+
+- [ps4-linux](https://github.com/sony-jaguar-devs/ps4-linux) (branch `7.0-Clean`): the PS4 Linux kernel. Its release files are built from it with the patches in `patches/kernel/`.
+- [rmuxnet's Linux kernel](https://gitlab.com/rmuxnet/linux): Baikal southbridge support; the AHCI polling in `patches/kernel/0003` comes from it.
+- [Mesa](https://mesa3d.org/): the optional 3D graphics bundle, with the patches in `patches/mesa/`.
+- [GoldHEN](https://github.com/GoldHEN/GoldHEN): the jailbreak, FTP server and payload loader this project relies on.
+- [BusyBox](https://busybox.net/), [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup), [e2fsprogs](https://e2fsprogs.sourceforge.net/), [util-linux](https://github.com/util-linux/util-linux) and [XZ Utils](https://tukaani.org/xz/): tools inside the boot image.
+- [stb](https://github.com/nothings/stb): the PNG and JPEG decoder for logos.
 
 ## License
 
