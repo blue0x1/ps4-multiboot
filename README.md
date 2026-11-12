@@ -31,7 +31,7 @@ Created by **[Chokri Hammedi (blue0x1)](https://github.com/blue0x1)**. Based on 
 
 - A jailbroken PS4 with **GoldHEN** (for its FTP server and payload loader).
 - A PC on the same network with an FTP client (for example FileZilla).
-- About 28 GB free on the PS4 for each distro installed on it (a 16 GB disk, and 10 GB always left free for the PS4), or a USB drive of 8 GB or more per distro.
+- Free space on the PS4 for each distro installed on it: its disk (you choose the size when installing, from about 6 GB for EmuFive; 16 GB is suggested) plus 10 GB always left free for the PS4. Or a USB drive of 8 GB or more per distro.
 - Optional: a DualShock 4 with a USB cable, or a USB keyboard.
 
 Consoles: tested on the PS4 Pro (Belize southbridge). Later Slims and Pros with the Baikal southbridge (many CUH-21xx/22xx and CUH-71xx/72xx) are experimental: Linux starts and the display works, but USB drives may not be writable yet. The original PS4 (CUH-10xx/11xx, Aeolia) is not tested yet.
@@ -55,7 +55,7 @@ Consoles: tested on the PS4 Pro (Belize southbridge). Later Slims and Pros with 
 
    > **Be patient:** after the payload starts, the TV can show **"No signal" or a black screen for 1 to 2 minutes** while Linux starts. This is normal.
 
-5. In the menu, pick a distro, then **Install to PS4** or **Install to USB drive**. A full desktop distro takes about 10 to 15 minutes, a minimal one a few minutes.
+5. In the menu, pick a distro, then **Install to PS4** or **Install to USB drive**. For the PS4, choose how big its disk will be (Left / Right 2 GB, L1 / R1 16 GB): a bigger disk has more room but takes longer to create, and it cannot be resized later. A full desktop distro takes about 10 to 15 minutes, a minimal one a few minutes. If something fails, the screen offers **Back to the menu** or **Text mode** (a console with the details, for a keyboard).
 
 ## Choosing a distro
 
@@ -178,6 +178,8 @@ Kernel command-line options (in `bootargs.txt`):
 | `ps4_root=LABEL=…` / `UUID=…` / `/dev/…` | Boot this root directly, no menu |
 | `ps4_rootwait=30` | Wait longer for a slow USB drive |
 | `ps4_rescue` | Open a shell before anything else |
+| `ps4_disk_size=24G` | Size of a new disk on the PS4 without asking (`24`, `24G` or `24576M`), kept between the distro's minimum and the free space |
+| `quiet loglevel=1` | No kernel or system text on the screen while starting (in the default `bootargs.txt`; remove both to see the boot messages) |
 
 ## Project layout
 

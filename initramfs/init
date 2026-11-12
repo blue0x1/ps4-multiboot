@@ -15,6 +15,9 @@
 #   ps4_rootwait=<sec>     how long to wait for USB drives (default 10, or 30
 #                          when the loader gave no PS4 drive key)
 #   ps4_rescue             open a shell before anything else
+#   ps4_disk_size=<size>   size of a new disk on the PS4 drive, without asking:
+#                          GB (24 or 24G) or MB (24576M); kept between the
+#                          distro's minimum and what the PS4 drive can spare
 # The Kali for PS4 names (kali_root=, kali_rootwait=, kali_rescue) still work.
 
 /bin/busybox --install -s /bin
@@ -28,12 +31,14 @@ root_spec=""
 rootwait=""
 rescue=0
 default_id=""
+disk_size_arg=""
 for arg in $(cat /proc/cmdline); do
     case "$arg" in
         ps4_root=*|kali_root=*)         root_spec="${arg#*_root=}" ;;
         ps4_rootwait=*|kali_rootwait=*) rootwait="${arg#*_rootwait=}" ;;
         ps4_rescue|kali_rescue)         rescue=1 ;;
         ps4_default=*)                  default_id="${arg#ps4_default=}" ;;
+        ps4_disk_size=*)                disk_size_arg="${arg#ps4_disk_size=}" ;;
     esac
 done
 if [ -z "$rootwait" ]; then
@@ -300,12 +305,34 @@ ui_busy_end() {
     busy_pid=""
 }
 
+# Error screen with two buttons: Back (to the menu, or Restart when there
+# is no menu) and Text mode (the rescue console). The answer is kept in
+# ui_answer (back or text) for back_or_shell.
+ui_answer=""
+ui_back_label="Restart the PS4"
 ui_error() {
     msg "$1"
     [ -x /bin/fbui ] || return 0
-    fbui error "${UI_IMG:--}" "$1"
-    sleep 10
-    fbui text
+    if fbui fail "${UI_IMG:--}" "$1" "$ui_back_label"; then
+        ui_answer=back
+    else
+        ui_answer=text
+    fi
+    msg "error screen: $ui_answer"
+}
+
+# After a failed boot or install: asks Back or Text mode (unless an error
+# screen already did), then goes back to the menu (returns 0, the caller
+# continues), restarts the PS4 (no menu to go back to), or opens the rescue
+# console.
+back_or_shell() {
+    [ -n "$ui_answer" ] || ui_error "$1"
+    a="$ui_answer"; ui_answer=""
+    case "$a" in
+        back) [ "$ui_back_label" = "Back to the menu" ] && return 0
+              ui_reboot ;;
+    esac
+    rescue_shell "$1"
 }
 # ----------------------------------------------------------------------------
 
@@ -572,22 +599,66 @@ first_boot_install() {
 # 8 GiB, always leaving 10 GiB free for the PS4). This is the only time Linux
 # writes the PS4's filesystem: one new, fully allocated file. Then it is
 # read-only again.
-HDD_IMG_MB=16384
-HDD_MIN_MB=8192
-HDD_KEEP_FREE_MB=10240
+HDD_IMG_MB=16384        # suggested size
+HDD_MIN_MB=4096         # never smaller
+HDD_ROOM_MB=4096        # room on top of the unpacked distro (updates, swap, games)
+HDD_KEEP_FREE_MB=10240  # always left free for the PS4 itself
+
+# Smallest disk for the selected distro, in MB: its unpacked size plus
+# HDD_ROOM_MB, rounded up to an even number of GB, at least HDD_MIN_MB. XZ
+# Utils reads the unpacked size from the archive's index in a moment; other
+# archives are guessed at four times their size.
+min_image_mb() {
+    local f="/ps4hdd/$HDD_TAR" mb=""
+    case "$f" in
+        *.xz) [ -x /bin/xz-mt ] && mb=$(xz-mt --robot -l "$f" 2>/dev/null \
+                  | awk '$1 == "totals" { printf "%d", $5 / 1048576 + 1 }') ;;
+    esac
+    [ -n "$mb" ] || mb=$(( $(stat -c %s "$f" 2>/dev/null || echo 0) * 4 / 1048576 ))
+    mb=$(( (mb + HDD_ROOM_MB + 2047) / 2048 * 2048 ))
+    [ "$mb" -lt "$HDD_MIN_MB" ] && mb=$HDD_MIN_MB
+    echo "$mb"
+}
+
+# ps4_disk_size= in MB ("24", "24G" and "24g" are GB, "24576M" MB), or nothing.
+disk_size_arg_mb() {
+    case "$disk_size_arg" in
+        "") ;;
+        *[Mm]) n="${disk_size_arg%[Mm]}"; case "$n" in ''|*[!0-9]*) ;; *) echo "$n" ;; esac ;;
+        *)     n="${disk_size_arg%[Gg]}"; case "$n" in ''|*[!0-9]*) ;; *) echo $(( n * 1024 )) ;; esac ;;
+    esac
+}
 
 create_image() {
     free_mb=$(df -m /ps4hdd | awk 'NR==2{print $4}')
-    size_mb=$HDD_IMG_MB
-    avail=$(( ${free_mb:-0} - HDD_KEEP_FREE_MB ))
-    [ "$avail" -lt "$size_mb" ] && size_mb=$avail
-    if [ "$size_mb" -lt "$HDD_MIN_MB" ]; then
+    min_mb=$(min_image_mb)
+    max_mb=$(( ${free_mb:-0} - HDD_KEEP_FREE_MB ))
+    max_mb=$(( max_mb / 1024 * 1024 ))
+    msg "disk size: minimum $min_mb MB, at most $max_mb MB (${free_mb:-?} MB free, $HDD_KEEP_FREE_MB MB kept for the PS4)"
+    if [ "$max_mb" -lt "$min_mb" ]; then
         ui_welcome
-        ui_error "Not enough free space on the PS4: ${free_mb:-?} MB free, $((HDD_MIN_MB + HDD_KEEP_FREE_MB)) MB needed"
+        ui_error "Not enough free space for $DNAME: $(( ${free_mb:-0} / 1024 )) GB free on the PS4, $(( (min_mb + HDD_KEEP_FREE_MB) / 1024 )) GB needed"
         return 1
     fi
     # Nothing is written to the PS4 drive before the Install button.
     ui_welcome
+    size_mb=$HDD_IMG_MB
+    [ "$size_mb" -gt "$max_mb" ] && size_mb=$max_mb
+    [ "$size_mb" -lt "$min_mb" ] && size_mb=$min_mb
+    arg_mb=$(disk_size_arg_mb)
+    if [ -n "$arg_mb" ]; then
+        size_mb=$arg_mb
+        [ "$size_mb" -gt "$max_mb" ] && size_mb=$max_mb
+        [ "$size_mb" -lt "$min_mb" ] && size_mb=$min_mb
+        msg "disk size from ps4_disk_size=$disk_size_arg: $size_mb MB"
+    elif [ -x /bin/fbui ]; then
+        gb=$(fbui disksize "$UI_IMG" $(( min_mb / 1024 )) $(( max_mb / 1024 )) $(( size_mb / 1024 )) \
+                 $(( ${free_mb:-0} / 1024 )) 2>/dev/null)
+        case "$gb" in ''|*[!0-9]*) ;; *) size_mb=$(( gb * 1024 )) ;; esac
+        [ "$size_mb" -gt "$max_mb" ] && size_mb=$max_mb
+        [ "$size_mb" -lt "$min_mb" ] && size_mb=$min_mb
+        msg "disk size chosen: $size_mb MB"
+    fi
     if ! mount -o remount,rw /ps4hdd; then
         ui_error "Installation failed: could not open the PS4 drive for writing"
         return 1
@@ -772,6 +843,12 @@ show_banner() {
     while [ ! -e /dev/fb0 ] && [ "$i" -lt 10 ]; do sleep 1; i=$((i + 1)); done
     [ -e /dev/fb0 ] || return 0
     echo 1 > /proc/sys/kernel/printk          # keep kernel messages off the screen
+    # The graphical start page right away: no console text before the menu.
+    # It stays up (the console is not drawn in graphics mode) until the menu
+    # or an install screen replaces it.
+    if [ -x /bin/fbui ] && FBUI_TITLE="PS4 Multiboot" fbui msg - "Starting..." 2>/dev/null; then
+        return 0
+    fi
     rows=$(cut -d, -f2 /sys/class/graphics/fb0/virtual_size 2>/dev/null)
     rows=$(( ${rows:-1080} / 16 ))            # 8x16 console font
     cols=$(( $(cut -d, -f1 /sys/class/graphics/fb0/virtual_size 2>/dev/null || echo 1920) / 8 ))
@@ -862,6 +939,9 @@ while ! grep -q ' /newroot ' /proc/mounts; do
     fi
     entries="$(echo "$entries" | grep -v '^$')"
     count=$(echo "$entries" | grep -c .)
+    ui_answer=""
+    ui_back_label="Restart the PS4"
+    [ "$count" -gt 1 ] && ui_back_label="Back to the menu"
     msg "found $count: $(echo "$entries" | tr '\n' ' ')"
 
     if [ "$count" = 0 ]; then
@@ -920,7 +1000,7 @@ while ! grep -q ' /newroot ' /proc/mounts; do
     if [ "$kind$where" = busb ]; then
         hdd_close
         dev_boot "$dev" && break
-        rescue_shell "could not boot $DNAME from $dev"
+        back_or_shell "Could not start $DNAME from the USB drive"
         continue
     fi
     if [ "$kind" = i ] && [ "$count" -gt 1 ]; then
@@ -931,7 +1011,8 @@ while ! grep -q ' /newroot ' /proc/mounts; do
         [ "$install_target" = back ] && continue
     fi
     hdd_boot && break
-    rescue_shell "could not start $DNAME"
+    hdd_close
+    back_or_shell "Could not start $DNAME"
 done
 
 ensure_modules
@@ -956,6 +1037,8 @@ for fw in amdgpu edid; do
 done
 
 msg "switching to ${DNAME:-the root filesystem}"
+# The last screen until the system draws its own: "Starting <name>...".
+[ -x /bin/fbui ] && fbui msg "${UI_IMG:--}" "Starting ${DNAME:-Linux}..." 2>/dev/null
 save_log "root mounted, switching" boot
 
 # Keep copying the kernel log to PS4BOOT for 3 minutes after the switch, so
@@ -976,8 +1059,11 @@ if bd="$(findfs LABEL=PS4BOOT 2>/dev/null)" && mkdir -p /bootfs && mount -t vfat
     ) </dev/null >/dev/null 2>&1 &
 fi
 
+# Back to the text console for the system (its login prompt needs it), but
+# blank and without a cursor, so no text scene shows before its own screen.
+# Its own boot messages stay hidden with "quiet" in bootargs.txt.
 [ -x /bin/fbui ] && fbui text
-printf '\033[r\033[?25h' > /dev/console 2>/dev/null   # undo the boot-screen scroll region
+printf '\033[r\033[2J\033[H\033[?25l' > /dev/console 2>/dev/null
 [ -n "$hdmi_pid" ] && kill "$hdmi_pid" 2>/dev/null
 umount /proc /sys
 mount --move /dev /newroot/dev

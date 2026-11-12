@@ -21,6 +21,11 @@
  *                                 $FBUI_BACK set it is a Back button (and
  *                                 Circle goes back) that exits with code 30.
  *                                 $FBUI_NAME names the distro in questions.
+ *   fbui disksize IMG MIN MAX DEF FREE
+ *                                 asks how big the disk on the PS4 drive will
+ *                                 be (GB, MIN..MAX, 2 GB steps, L1 / R1 16 GB)
+ *                                 and prints it; after 60 s with no input, DEF.
+ *                                 FREE is the PS4 drive's free space, shown.
  *   fbui progress IMG FROM TO SIZE LABEL
  *                                 copies stdin to stdout and fills the bar from
  *                                 FROM% to TO% as SIZE bytes go through
@@ -29,6 +34,8 @@
  *                                 killed (SIGTERM), for waits with no progress
  *   fbui done IMG LABEL           full bar and a final message
  *   fbui error IMG LABEL          message in red
+ *   fbui fail IMG LABEL BACK      message in red with two buttons, BACK and
+ *                                 "Text mode"; exit code 0 = BACK, 1 = Text mode
  *   fbui text                     gives the screen back to the text console
  *   fbui scan DIR PATTERN...      reads a tar stream on stdin and saves only
  *                                 the members matching a PATTERN (fnmatch,
@@ -850,7 +857,8 @@ static void buttons(const char *const *l, int n, int sel, int down, int by)
 	}
 }
 
-enum { A_NONE, A_LEFT, A_RIGHT, A_OK, A_BACK, A_OTHER };
+/* A_PREV / A_NEXT: L1 / R1 (Page Up / Page Down), the big steps on the disk size page. */
+enum { A_NONE, A_LEFT, A_RIGHT, A_OK, A_BACK, A_OTHER, A_PREV, A_NEXT };
 
 struct dev { int fd, stick, sx; char name[32]; };
 static struct dev devs[16];
@@ -907,6 +915,8 @@ static int action(struct dev *dv, const struct input_event *ev)
 		 * Cross is BTN_THUMB and Circle BTN_THUMB2. */
 		case BTN_THUMB: return A_OK;
 		case BTN_THUMB2: return A_BACK;
+		case BTN_TL: case KEY_PAGEUP: return A_PREV;
+		case BTN_TR: case KEY_PAGEDOWN: return A_NEXT;
 		case KEY_POWER: case KEY_SLEEP: case KEY_WAKEUP: return A_NONE;
 		default: return A_OTHER;
 		}
@@ -1028,7 +1038,7 @@ static int choose(const char *title, uint32_t tcolor, const char *const *l, int 
 			dirty = 1;
 		} else if (act == A_BACK && back >= 0) {
 			return back;
-		} else if (act == A_OK || (n == 1 && act == A_OTHER)) {
+		} else if (act == A_OK || (n == 1 && act >= A_OTHER)) {
 			if (!fb)
 				return sel;
 			down = 1;
@@ -1068,6 +1078,99 @@ static int welcome(const char *usb)
 			   "Left / Right to choose, X to confirm, Circle to go back", NULL) == 1)
 			return 10;
 	}
+}
+
+/*
+ * Disk size page: how big the distro's disk on the PS4 drive will be, in GB,
+ * from MIN to MAX in steps of 2 GB (L1 / R1: 16 GB). X confirms; with no input
+ * for 60 s it goes on with DEF, so a PS4 with no input still installs. Prints
+ * the size to stdout.
+ */
+static int disksize(int min, int max, int def, int freegb)
+{
+	int v = def < min ? min : def > max ? max : def;
+	int ty = lower_top() - 30, vy = lower_top() + 26;
+	int iy = vy + font_title.height + 26, hy = iy + 36, ky = hy + 36, cy = ky + 36;
+	int left = 60, counting = 1, dirty = 1;
+	time_t start = time(NULL);
+	char q[160], info[160], val[32], s[96];
+
+	snprintf(q, sizeof(q), "How big should the %s disk be?", distro_name);
+	snprintf(info, sizeof(info), "Smallest %d GB   -   Largest %d GB   -   Free on the PS4 %d GB",
+		 min, max, freegb);
+	for (;;) {
+		double frame_start = now_s();
+
+		if (fb) {
+			if (dirty) {
+				int vw;
+
+				header();
+				clear_lower();
+				text(&font_body, -1, ty, q, WHITE);
+				snprintf(val, sizeof(val), "%d GB", v);
+				vw = text_w(&font_title, val);
+				text(&font_title, -1, vy, val, WHITE);
+				text(&font_title, (W - vw) / 2 - 140, vy, "<", v > min ? ACCENT : TRACK);
+				text(&font_title, (W + vw) / 2 + 140 - text_w(&font_title, ">"), vy, ">",
+				     v < max ? ACCENT : TRACK);
+				text(&font_small, -1, iy, info, GREY);
+				text(&font_small, -1, hy,
+				     "Bigger: more room for games, slower to create. It cannot be changed later.",
+				     GREY);
+				text(&font_small, -1, ky, "Left / Right: 2 GB   L1 / R1: 16 GB   X to confirm", GREY);
+				if (counting) {
+					snprintf(s, sizeof(s), "Continues with %d GB in %d s", v, left > 0 ? left : 0);
+					text(&font_small, -1, cy, s, GREY);
+				}
+				memcpy(bb_static, bb, (size_t)W * H * 4);
+				dirty = 0;
+			}
+			memcpy(bb, bb_static, (size_t)W * H * 4);
+			scene(-1);
+			blit();
+		}
+		int wait = fb ? 16 - (int)((now_s() - frame_start) * 1000) : 200;
+		int act = next_action(wait < 1 ? 1 : wait), step = 0;
+
+		if (act == A_NONE) {
+			if (counting) {
+				int now = 60 - (int)(time(NULL) - start);
+
+				if (now <= 0)
+					break;
+				if (now != left) {
+					left = now;
+					dirty = 1;
+				}
+			}
+			continue;
+		}
+		if (counting) {
+			counting = 0;
+			dirty = 1;
+		}
+		if (act == A_OK)
+			break;
+		step = act == A_LEFT ? -2 : act == A_RIGHT ? 2 : act == A_PREV ? -16 : act == A_NEXT ? 16 : 0;
+		if (step) {
+			int n = v + step;
+
+			/* Sizes stay on even numbers; the ends are MIN and MAX themselves. */
+			if (step > 0 && n % 2)
+				n--;
+			if (step < 0 && n % 2)
+				n++;
+			n = n < min ? min : n > max ? max : n;
+			if (n != v) {
+				v = n;
+				dirty = 1;
+			}
+		}
+	}
+	printf("%d\n", v);
+	fflush(stdout);
+	return 0;
 }
 
 static int bar_x(void) { return (W - 760) / 2; }
@@ -1782,7 +1885,7 @@ int main(int argc, char **argv)
 	if (!strcmp(mode, "scan") && argc >= 4)
 		return scan_tar(argv[2], argc - 3, argv + 3);
 	if (argc < 3) {
-		fprintf(stderr, "usage: fbui menu|welcome|progress|busy|msg|done|error|text IMG ...\n");
+		fprintf(stderr, "usage: fbui menu|welcome|disksize|progress|busy|msg|done|error|text IMG ...\n");
 		return 2;
 	}
 	if (getenv("FBUI_TITLE"))
@@ -1799,6 +1902,8 @@ int main(int argc, char **argv)
 		return menu(atoi(argv[3]), atoi(argv[4]), argc - 5, argv + 5);
 	} else if (!strcmp(mode, "welcome")) {
 		return welcome(argc > 3 ? argv[3] : NULL);
+	} else if (!strcmp(mode, "disksize") && argc == 7) {
+		return disksize(atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), atoi(argv[6]));
 	} else if (!strcmp(mode, "progress") && argc == 7) {
 		return progress(atoi(argv[3]), atoi(argv[4]), strtoull(argv[5], NULL, 10), argv[6]);
 	} else if (!strcmp(mode, "busy") && argc == 4) {
@@ -1807,6 +1912,13 @@ int main(int argc, char **argv)
 		page(argv[3], WHITE, -1, NULL);
 	} else if (!strcmp(mode, "done") && argc == 4) {
 		page(argv[3], WHITE, 1000, NULL);
+	} else if (!strcmp(mode, "fail") && argc == 5) {
+		/* The message in red with BACK (e.g. "Back to the menu") and "Text mode".
+		 * Exit code 0: BACK, 1: Text mode. Circle is BACK. */
+		const char *l[] = { argv[4], "Text mode" };
+
+		return choose(argv[3], RED, l, 2, 0, 0, 0,
+			      "Text mode opens a console with the details (it needs a keyboard)", NULL) == 1;
 	} else if (!strcmp(mode, "error") && argc == 4) {
 		page(argv[3], RED, -1, "A text console with the details opens in a few seconds");
 	} else {
