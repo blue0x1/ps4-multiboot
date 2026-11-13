@@ -8,8 +8,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$ROOT/build"
 OUT="$ROOT/out"
 
-KERNEL_REPO="${KERNEL_REPO:-https://github.com/sony-jaguar-devs/ps4-linux.git}"
-KERNEL_BRANCH="${KERNEL_BRANCH:-7.0-Clean}"
+# Strawberry PS4 kernel by rmuxnet (GPLv2). KERNEL_PROFILE and KERNEL_LTO are
+# passed to its build.sh as use= and lto=.
+KERNEL_REPO="${KERNEL_REPO:-https://gitlab.com/rmuxnet/linux.git}"
+KERNEL_BRANCH="${KERNEL_BRANCH:-ps4/7.3.3}"
+KERNEL_PROFILE="${KERNEL_PROFILE:-General}"
+KERNEL_LTO="${KERNEL_LTO:-ThinLTO}"
+KERNEL_BUILDER_IMAGE="strawberry-kernel-builder"
 DISTRO="${DISTRO:-kali}"
 PROFILE="${PROFILE:-desktop}"
 TOOLS="${TOOLS:-none}"

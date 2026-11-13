@@ -190,7 +190,6 @@ Kernel command-line options (in `bootargs.txt`):
 | `initramfs/blockmap.c` | Maps the image files on the PS4 drive without writing the PS4's file system |
 | `initramfs/ps4hdmi.c` | Keeps the PS4 Slim/Pro HDMI output on |
 | `initramfs/stb_image.h` | PNG and JPEG decoder for logos ([stb](https://github.com/nothings/stb), public domain / MIT) |
-| `patches/kernel/` | HDMI bridge fixes and Baikal southbridge support for the PS4 kernel |
 | `patches/mesa/`, `overlay-mesa/` | Mesa patches for the PS4 GPU, and the `ps4-mesa-*` helpers in the 3D graphics bundle |
 | `config/`, `docker/`, `scripts/`, `overlay/` | Build system, and settings for the optional `make rootfs` archives |
 | `assets/logos/`, `tools/` | Built-in logos, font and logo converters, HDMI bridge debugging tool |
@@ -199,7 +198,7 @@ Kernel command-line options (in `bootargs.txt`):
 
 PS4 Multiboot builds on the work of others:
 
-- [ps4-linux](https://github.com/sony-jaguar-devs/ps4-linux) (branch `7.0-Clean`): the PS4 Linux kernel. Its release files are built from it with the patches in `patches/kernel/`.
+- [Strawberry](https://gitlab.com/rmuxnet/linux) by rmuxnet (branch `ps4/7.3.3`): the PS4 Linux kernel. Its release files are built from it with its own `build.sh` (`use=General lto=ThinLTO`), plus the extra drivers in `config/ps4.config`.
 - [Mesa](https://mesa3d.org/): the optional 3D graphics bundle, with the patches in `patches/mesa/`.
 - [GoldHEN](https://github.com/GoldHEN/GoldHEN): the jailbreak, FTP server and payload loader this project relies on.
 - [BusyBox](https://busybox.net/), [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup), [e2fsprogs](https://e2fsprogs.sourceforge.net/), [util-linux](https://github.com/util-linux/util-linux) and [XZ Utils](https://tukaani.org/xz/): tools inside the boot image.
