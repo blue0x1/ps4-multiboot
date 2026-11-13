@@ -1,0 +1,83 @@
+PS4: no FLAT memory instructions in ACO on Liverpool/Gladius (they hang the GPU).
+
+On GFX7, ACO writes global memory with FLAT instructions. On the PS4 GPU they
+hang the gfx ring: RADV's meta_fill_memory shader (vkCmdFillBuffer, also used
+to set up HiZ) hangs on its first flat_store_dwordx4, seen with RADV_DEBUG=hang
+when a Vulkan app starts. radeonsi with LLVM uses MUBUF addr64 on GFX7 and works.
+Use MUBUF addr64, as on GFX6, for these two GPUs.
+
+--- a/src/amd/compiler/aco_ir.h
++++ b/src/amd/compiler/aco_ir.h
+@@ -2305,6 +2305,9 @@
+    bool has_point_sample_accel = false;
+    bool has_gfx6_mrt_export_bug = false;
+    bool has_desc_resource_level = false;
++   /* PS4 Liverpool/Gladius: FLAT memory instructions hang the GPU, so global
++    * memory goes through MUBUF with addr64, as on GFX6. */
++   bool no_flat_global = false;
+ 
+    int32_t scratch_global_offset_min;
+    int32_t scratch_global_offset_max;
+--- a/src/amd/compiler/aco_ir.cpp
++++ b/src/amd/compiler/aco_ir.cpp
+@@ -70,6 +70,8 @@
+    program->config = config;
+    program->info = *info;
+    program->gfx_level = options->gfx_level;
++   program->dev.no_flat_global =
++      options->family == CHIP_LIVERPOOL || options->family == CHIP_GLADIUS;
+    program->wave_size = info->wave_size;
+    program->lane_mask = program->wave_size == 32 ? s1 : s2;
+    program->preserve_s2 = info->vs.preserve_s2;
+--- a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
++++ b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+@@ -795,7 +795,8 @@
+          offset_src = nullptr;
+       }
+ 
+-      if (bld.program->gfx_level >= GFX7 && address.type() == RegType::vgpr)
++      if (bld.program->gfx_level >= GFX7 && address.type() == RegType::vgpr &&
++          !bld.program->dev.no_flat_global)
+          format = Format::FLAT;
+    }
+ 
+@@ -829,7 +830,8 @@
+       if (offset.id() && (address.type() == RegType::vgpr
+                              ? offset.type() != RegType::sgpr
+                              : add_might_overflow(ctx, offset_src, const_offset + payload_size))) {
+-         if (offset.type() == RegType::vgpr && bld.program->gfx_level > GFX6) {
++         if (offset.type() == RegType::vgpr && address.type() == RegType::sgpr &&
++             bld.program->gfx_level > GFX6) {
+             assert(address.type() == RegType::sgpr);
+             address = add64_const64(bld, address, const_offset);
+             const_offset = 0;
+@@ -916,7 +918,8 @@
+    RegClass rc = RegClass::get(RegType::vgpr, bytes_size);
+    Temp val = rc == info.dst.regClass() ? info.dst : bld.tmp(rc);
+    if (format == Format::MUBUF) {
+-      assert(bld.program->gfx_level == GFX6 || addr.type() != RegType::vgpr);
++      assert(bld.program->gfx_level == GFX6 || bld.program->dev.no_flat_global ||
++             addr.type() != RegType::vgpr);
+ 
+       aco_ptr<Instruction> mubuf{
+          create_instruction(mubuf_op, Format::MUBUF, 3 + 2 * info.disable_wqm, 1)};
+@@ -2538,7 +2541,8 @@
+          init_disable_wqm(bld, flat->flatlike(), true);
+          ctx->block->instructions.emplace_back(std::move(flat));
+       } else {
+-         assert(ctx->options->gfx_level == GFX6 || write_address.type() != RegType::vgpr);
++         assert(ctx->options->gfx_level == GFX6 || ctx->program->dev.no_flat_global ||
++                write_address.type() != RegType::vgpr);
+ 
+          aco_opcode op = get_buffer_store_op(write_datas[i].bytes());
+ 
+@@ -2681,7 +2685,8 @@
+       init_disable_wqm(bld, flat->flatlike(), true);
+       ctx->block->instructions.emplace_back(std::move(flat));
+    } else {
+-      assert(ctx->options->gfx_level == GFX6 || addr.type() != RegType::vgpr);
++      assert(ctx->options->gfx_level == GFX6 || ctx->program->dev.no_flat_global ||
++             addr.type() != RegType::vgpr);
+ 
+       UNUSED aco_opcode image_op;
+       translate_buffer_image_atomic_op(nir_op, &op32, &op64, &image_op);
