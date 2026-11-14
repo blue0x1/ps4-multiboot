@@ -531,19 +531,26 @@ hdd_open() {
 
     # Aeolia (CUH-10xx/11xx) uses no IV offset; Belize and Baikal mix in the
     # partition position (same values as the community internal-HDD initramfs).
-    skip=111669149696
-    [ "$(cat /sys/bus/pci/devices/0000:00:14.0/device 2>/dev/null)" = 0x908f ] && skip=0
-    cryptsetup --disable-locks -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 \
-        --offset 0 --skip "$skip" create ps4hdd "$part" > /dev/kmsg 2>&1 \
-        || { msg "hdd: could not unlock $part"; return 1; }
-
+    # The southbridge says which one comes first. When the filesystem does not
+    # show up that way, the other one is tried: some consoles do not match
+    # their southbridge's rule. Both tries only read the drive.
+    sb="$(cat /sys/bus/pci/devices/0000:00:14.0/device 2>/dev/null)"
+    skips="111669149696 0"
+    [ "$sb" = 0x908f ] && skips="0 111669149696"
     mkdir -p /ps4hdd
-    if ! mount -t ufs -o ro,ufstype=ufs2 /dev/mapper/ps4hdd /ps4hdd; then
-        msg "hdd: could not mount PS4 user partition (read-only)"
+    for skip in $skips; do
+        cryptsetup --disable-locks -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 \
+            --offset 0 --skip "$skip" create ps4hdd "$part" > /dev/kmsg 2>&1 \
+            || { msg "hdd: could not unlock $part"; return 1; }
+        if mount -t ufs -o ro,ufstype=ufs2 /dev/mapper/ps4hdd /ps4hdd 2> /dev/kmsg; then
+            [ "$skip" = "${skips%% *}" ] || msg "hdd: unlocked with IV offset $skip (southbridge ${sb:-unknown})"
+            hdd_is_open=1
+            return 0
+        fi
         cryptsetup --disable-locks remove ps4hdd
-        return 1
-    fi
-    hdd_is_open=1
+    done
+    msg "hdd: could not mount PS4 user partition (read-only), southbridge ${sb:-unknown}"
+    return 1
 }
 
 # Unmounts the PS4 filesystem and removes every mapping on it.
